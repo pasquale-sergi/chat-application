@@ -1,12 +1,17 @@
 package Database;
 
+import Room.Room;
 import User.User;
+import com.mysql.cj.x.protobuf.MysqlxPrepare;
 
 import java.net.ConnectException;
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class DbHelper {
     private Connection connection;
+    private Room rooms;
 
     public DbHelper(String dbUrl, String dbUser, String dbPassword) throws SQLException{
         try {
@@ -34,7 +39,6 @@ public class DbHelper {
             if(res.next()){
                 String retrievedUsername = res.getString("username");
                 String retrievedPassword = res.getString("password");
-                System.out.println("User found: " + retrievedUsername);
                 return new User(retrievedUsername, retrievedPassword);
             } else {
                 System.out.println("User not found for username: " + username);
@@ -44,4 +48,31 @@ public class DbHelper {
         }
         return null;
     }
+
+    public boolean addRoom(String name, String password){
+        String query = "insert into rooms(name, password) values(?,?)";
+        try(PreparedStatement st = connection.prepareStatement(query)){
+            st.setString(1,name);
+            st.setString(2,password);
+            st.executeUpdate();
+            return true;
+        }catch (SQLException e){
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public List<Room> getRooms() throws SQLException {
+        String query = "SELECT * FROM rooms";
+        List<Room> rooms = new ArrayList<>();
+        try (Statement statement = connection.createStatement()) {
+            ResultSet res = statement.executeQuery(query);
+            while (res.next()) {
+                rooms.add(new Room(res.getString("name"), res.getString("password")));
+            }
+        }
+        return rooms;
+    }
+
+
 }

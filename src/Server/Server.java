@@ -1,11 +1,15 @@
+package Server;
+
 import Auth.AuthHandler;
 import Database.DbHelper;
+import Room.Room;
 
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.nio.Buffer;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Server {
 
@@ -13,13 +17,15 @@ public class Server {
     private DbHelper dbHelper;
     private AuthHandler auth;
 
+    private List<Room> rooms;
+
 
     //making the constructor
     public Server(ServerSocket serverSocket, DbHelper dbHelper, AuthHandler auth){
         this.serverSocket = serverSocket;
         this.dbHelper = dbHelper;
         this.auth = auth;
-
+        this.rooms = new ArrayList<>();
     }
 
     public void startServer( ){
@@ -27,7 +33,7 @@ public class Server {
             while(!serverSocket.isClosed()){
                 //waiting for someone to connect
                 Socket socket = serverSocket.accept();
-                ClientHandler client = new ClientHandler(socket, auth);
+                ClientHandler client = new ClientHandler(socket, auth, dbHelper, rooms);
                 System.out.println("A new client has connected!");
 
 

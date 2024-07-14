@@ -13,13 +13,11 @@ public class AuthHandler {
         this.dbHelper = dbHelper;
     }
 
-    public boolean registerUser(String username, String password){
+    public void registerUser(String username, String password){
         try {
             dbHelper.createUser(username, password);
-            return true;
         }catch (SQLException e){
             e.printStackTrace();
-            return false;
         }
     }
 

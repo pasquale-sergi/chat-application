@@ -1,8 +1,7 @@
-import Auth.AuthHandler;
+package Server;
 
 import java.io.*;
 import java.net.Socket;
-import java.nio.Buffer;
 import java.util.Scanner;
 
 public class Client {
@@ -12,6 +11,8 @@ public class Client {
 
     private Socket socket;
     private String username;
+
+
 
 
 
