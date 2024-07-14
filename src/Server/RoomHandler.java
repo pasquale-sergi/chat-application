@@ -16,7 +16,6 @@ public class RoomHandler{
     public List<Room> rooms;
     private DbHelper db;
     private ClientHandler clientHandler;
-    private Room currentRoom;
 
 
     public RoomHandler(Socket socket, DbHelper db, ClientHandler clientHandler, List<Room> rooms) throws IOException, SQLException {
@@ -25,8 +24,8 @@ public class RoomHandler{
         this.clientHandler = clientHandler;
         this.rooms =rooms;
 
-        out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
-        in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        this.out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+        this.in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
         // Load rooms from the database if they are not already loaded
         if (this.rooms.isEmpty()) {
@@ -66,8 +65,8 @@ public class RoomHandler{
         for (Room room : rooms) {
             if (room.getName().equalsIgnoreCase(choice)) {
                 roomFound = true;
-                currentRoom = room;
                 room.addClient(clientHandler);
+                clientHandler.setCurrentRoom(room);
                 break;
             }
         }
@@ -94,7 +93,6 @@ public class RoomHandler{
     }
 
     public void getServerRooms() throws IOException, SQLException {
-        rooms = db.getRooms();
         out.write("Server's Rooms:");
         out.newLine();
         out.flush();
@@ -105,28 +103,7 @@ public class RoomHandler{
         }
     }
 
-    public String setRoomChoice() throws IOException {
-        out.write("Choose a room: ");
-        out.newLine();
-        out.flush();
-        String choice = splitInput(in.readLine());
-        boolean done = false;
-        while(!done){
-            for(Room room : rooms){
-                if (room.getName().equalsIgnoreCase(choice)) {
-                    done = true;
-                    break;
-                }
-            }
-        }
-
-        return choice;
-    }
-    public Room getCurrentRoom(){
-        return currentRoom;
-    }
-
-    public void createRoom(){
+    public void createRoom() throws IOException {
         try {
             out.write("Choose a name for the room: ");
             out.newLine();
@@ -138,17 +115,21 @@ public class RoomHandler{
             out.flush();
             String password = in.readLine();
 
-            db.addRoom(roomName, password);
-            currentRoom = new Room(roomName, password);
-            rooms.add(currentRoom);
-            currentRoom.addClient(clientHandler);
 
+            db.addRoom(roomName, password);
+            Room newRoom = new Room(roomName, password);
+            rooms.add(newRoom);
+            newRoom.addClient(clientHandler);
+            clientHandler.setCurrentRoom(newRoom);
             out.write("Room created and joined: " + roomName);
             out.newLine();
             out.flush();
 
         }catch (IOException e){
             e.printStackTrace();
+            out.write("Failed to create the room. Try again.");
+            out.newLine();
+            out.flush();
         }
     }
 

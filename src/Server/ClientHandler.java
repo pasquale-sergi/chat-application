@@ -22,19 +22,19 @@ public class ClientHandler implements Runnable{
     private Room currentRoom;
     private List<Room> rooms;
 
-    public ClientHandler(Socket socket, AuthHandler auth, DbHelper db, List<Room> rooms){
+    public ClientHandler(Socket socket, AuthHandler auth, DbHelper db, List<Room> rooms) {
         this.auth = auth;
         this.db = db;
         this.rooms = rooms;
-        try{
+        try {
             this.socket = socket;
 
             this.bufferedWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
             this.bufferedReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             //reading the line to take the username to assign to the client
             this.clientUsername = bufferedReader.readLine();
-            Scanner scanner =new Scanner(System.in);
-            while(true) {
+            Scanner scanner = new Scanner(System.in);
+            while (true) {
                 bufferedWriter.write("Are you registered? y/n: ");
                 bufferedWriter.newLine();
                 bufferedWriter.flush();
@@ -58,18 +58,15 @@ public class ClientHandler implements Runnable{
             // Initialize RoomHandler
             roomHandler = new RoomHandler(socket, db, this, rooms);
             //choose the room
-            setRoomChoice();
+            roomHandler.promptForRoomChoice();
             //now we send the entered chat message
-            broadcastMessage(clientUsername+" joined the chat!");
-        }catch (IOException e){
-            e.printStackTrace();        } catch (SQLException e) {
+            broadcastMessage(clientUsername + " joined the chat!");
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (SQLException e) {
             throw new RuntimeException(e);
         }
 
-    }
-    public void setRoomChoice() throws IOException, SQLException {
-        roomHandler.promptForRoomChoice();
-        currentRoom = roomHandler.getCurrentRoom();
     }
 
     public boolean authenticateClient() throws IOException {
@@ -116,10 +113,6 @@ public class ClientHandler implements Runnable{
         return result[1].trim();
     }
 
-    // Ensure to set the current room in the ClientHandler
-    public void setCurrentRoom(Room room) {
-        this.currentRoom = room;
-    }
 
     public boolean registerUser(){
         try {
@@ -210,6 +203,18 @@ public class ClientHandler implements Runnable{
         }catch (IOException e ){
             e.printStackTrace();
         }
+    }
+
+    public String getClientUsername() {
+        return clientUsername;
+    }
+
+    public void setCurrentRoom(Room room) {
+        this.currentRoom = room;
+    }
+
+    public Room getCurrentRoom() {
+        return currentRoom;
     }
 
     //no main method cause this is called inside the server class
