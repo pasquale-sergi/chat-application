@@ -1,3 +1,5 @@
+import Auth.AuthHandler;
+
 import java.io.*;
 import java.net.Socket;
 import java.nio.Buffer;
@@ -14,6 +16,7 @@ public class Client {
 
 
 
+
     public Client(Socket socket, String username){
         try {
             this.socket = socket;
@@ -21,26 +24,27 @@ public class Client {
             this.bufferedReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             this.username = username;
 
-        }catch (IOException e ){
-            closeEverything(socket, bufferedReader, bufferedWriter);
-        }
-    }
-
-    public void sendMessage(){
-        try {
             //we send the username to the client handler so it can assign it
             bufferedWriter.write(username);
             bufferedWriter.newLine();
             bufferedWriter.flush();
 
+        }catch (IOException e ){
+            closeEverything();
+        }
+    }
+
+    public void sendMessage() throws IOException {
+        try {
             Scanner scanner = new Scanner(System.in);
             while(socket.isConnected()){
                 String messageToSend = scanner.nextLine();
-                if(messageToSend.equalsIgnoreCase("/quit")){
+                if(messageToSend.equalsIgnoreCase("/quit")||messageToSend==null){
+                    System.out.println("You disconnected from the chat");
                     bufferedWriter.write("/quit");
                     bufferedWriter.newLine();
                     bufferedWriter.flush();
-                    closeEverything(socket, bufferedReader, bufferedWriter);
+                    closeEverything();
                 }
                     bufferedWriter.write(username + ": " + messageToSend);
                     bufferedWriter.newLine();
@@ -48,7 +52,7 @@ public class Client {
                 }
 
         }catch (IOException e){
-            closeEverything(socket, bufferedReader, bufferedWriter);
+            closeEverything();
         }
     }
 
@@ -59,23 +63,28 @@ public class Client {
                 while(socket.isConnected()) {
                     try {
                         messageFromGroupChat = bufferedReader.readLine();
+                        if(messageFromGroupChat==null){
+                            closeEverything();
+                        }
                         System.out.println(messageFromGroupChat);
 
                     } catch (IOException e) {
-                        closeEverything(socket, bufferedReader, bufferedWriter);
+                        closeEverything();
                     }
                 }
         }).start();
     }
 
-    public void closeEverything(Socket socket, BufferedReader bufferedReader, BufferedWriter bufferedWriter){
+    public void closeEverything(){
         try {
+
             if(bufferedReader != null){
                 bufferedReader.close();
             }
             if(bufferedWriter!=null){
                 bufferedWriter.close();
             }
+
             if(socket!=null){
                 socket.close();
             }
@@ -85,15 +94,20 @@ public class Client {
     }
 
     public static void main(String[] args) throws IOException {
-        Scanner scanner = new Scanner(System.in);
-        System.out.println("Enter your username for the group chat: ");
-        String username = scanner.nextLine();
-        Socket socket = new Socket("localhost", 1234);
-        Client client = new Client(socket, username);
 
-        //no issue with this two methods cause thanks to threads we can run them at the same time
-        client.listenForMessage();
-        client.sendMessage();
+            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(System.in));
 
+            System.out.println("Enter your username for the group chat: ");
+            String chatUsername = bufferedReader.readLine();
+
+            Socket socket = new Socket("localhost", 1234);
+            Client client = new Client(socket, chatUsername);
+            //no issue with this two methods cause thanks to threads we can run them at the same time
+        try {
+            client.listenForMessage();
+            client.sendMessage();
+        }catch (RuntimeException e){
+            client.closeEverything();
+        }
     }
 }

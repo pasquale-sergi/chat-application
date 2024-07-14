@@ -1,14 +1,25 @@
-import java.io.IOException;
+import Auth.AuthHandler;
+import Database.DbHelper;
+
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.Buffer;
+import java.sql.SQLException;
 
 public class Server {
 
-    private ServerSocket serverSocket; //responsible for incoming clients
+    private ServerSocket serverSocket; //responsible for incoming client
+    private DbHelper dbHelper;
+    private AuthHandler auth;
+
 
     //making the constructor
-    public Server(ServerSocket serverSocket){
+    public Server(ServerSocket serverSocket, DbHelper dbHelper, AuthHandler auth){
         this.serverSocket = serverSocket;
+        this.dbHelper = dbHelper;
+        this.auth = auth;
+
     }
 
     public void startServer( ){
@@ -16,15 +27,16 @@ public class Server {
             while(!serverSocket.isClosed()){
                 //waiting for someone to connect
                 Socket socket = serverSocket.accept();
+                ClientHandler client = new ClientHandler(socket, auth);
                 System.out.println("A new client has connected!");
-                ClientHandler client = new ClientHandler(socket);
+
 
                 //we need a new thread cause this gotta be a multithread operation otherwise can't connect multiple clients
                 Thread thread = new Thread(client);
                 thread.start();
             }
         }catch (IOException e){
-
+            e.printStackTrace();
         }
     }
     //if error occurs we shut down the server
@@ -40,8 +52,20 @@ public class Server {
 
     public static void main(String[] args) throws IOException {
         ServerSocket serverSocket = new ServerSocket(1234);
-        Server server = new Server(serverSocket);
-        server.startServer();
+        try {
+            DbHelper database = new DbHelper("jdbc:postgresql://localhost:5432/chat_app", "pasquale", "pasqui.123");
+            AuthHandler auth = new AuthHandler(database);
+            Server server = new Server(serverSocket, database, auth);
+            System.out.println("Starting chat server...");
+            server.startServer();
+            System.out.println("Chat server started...\n");
+
+
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            throw new RuntimeException("Failed to connect to the database: " + e.getMessage());
+        }
     }
 
 }
