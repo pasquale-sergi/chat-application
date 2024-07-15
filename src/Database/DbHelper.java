@@ -74,5 +74,20 @@ public class DbHelper {
         return rooms;
     }
 
+    public Room getRoomByName(String name){
+        String query = "select name, password from rooms where name = ?";
+        try(PreparedStatement st= connection.prepareStatement(query)){
+            st.setString(1, name);
+            ResultSet res = st.executeQuery();
+            if(res.next()){
+                String retrievedName = res.getString("name");
+                String retrievedPassword = res.getString("password");
+                return new Room(retrievedName, retrievedPassword);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+        return null;
+    }
 
 }

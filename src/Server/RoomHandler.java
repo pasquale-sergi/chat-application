@@ -40,17 +40,24 @@ public class RoomHandler{
     }
 
     public void promptForRoomChoice() throws IOException, SQLException {
-        out.write("Enter '/rooms' for Server's Rooms or '/create' for creating one.");
-        out.newLine();
-        out.flush();
-        String serverResponseRaw = in.readLine();
-        String serverResponse = splitInput(serverResponseRaw);
+        while(true){
+            out.write("Enter '/rooms' for Server's Rooms or '/create' for creating one.");
+            out.newLine();
+            out.flush();
+            String serverResponseRaw = in.readLine();
+            String serverResponse = splitInput(serverResponseRaw);
 
-        if (serverResponse.equalsIgnoreCase("/rooms")) {
-            getServerRooms();
-            joinRoom();
-        } else if (serverResponse.equalsIgnoreCase("/create")) {
-            createRoom();
+            if (serverResponse.equalsIgnoreCase("/rooms")) {
+                getServerRooms();
+                joinRoom();
+                break;
+            } else if (serverResponse.equalsIgnoreCase("/create")) {
+                createRoom();
+                break;
+            }else {
+                out.write("Invalid input.Try again please.\n");
+            }
+
         }
     }
 
@@ -65,9 +72,25 @@ public class RoomHandler{
         for (Room room : rooms) {
             if (room.getName().equalsIgnoreCase(choice)) {
                 roomFound = true;
-                room.addClient(clientHandler);
-                clientHandler.setCurrentRoom(room);
-                break;
+                Room roomObj = db.getRoomByName(choice);
+                //check auth for room
+                while(true) {
+                    out.write("Insert the password: ('password' by default for Room 1 and 2)");
+                    out.newLine();
+                    out.flush();
+                    String password = splitInput(in.readLine());
+                    System.out.println(password);
+                    if (roomObj.getPassword().equalsIgnoreCase(password)) {
+                        out.write("Password correct.");
+                        out.newLine();
+                        out.flush();
+                        room.addClient(clientHandler);
+                        clientHandler.setCurrentRoom(room);
+                        break;
+                    }else {
+                        out.write("Password incorrect.Try again.");
+                    }
+                }
             }
         }
 
@@ -113,7 +136,7 @@ public class RoomHandler{
             out.write("Choose a password for the room and share it only with users you want to access this room");
             out.newLine();
             out.flush();
-            String password = in.readLine();
+            String password =splitInput(in.readLine());
 
 
             db.addRoom(roomName, password);
