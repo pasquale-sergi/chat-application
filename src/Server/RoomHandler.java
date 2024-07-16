@@ -9,7 +9,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class RoomHandler{
+public class RoomHandler implements Runnable{
     private BufferedWriter out;
     private BufferedReader in;
     private Socket socket;
@@ -79,13 +79,13 @@ public class RoomHandler{
                     out.newLine();
                     out.flush();
                     String password = splitInput(in.readLine());
-                    System.out.println(password);
                     if (roomObj.getPassword().equalsIgnoreCase(password)) {
                         out.write("Password correct.");
                         out.newLine();
                         out.flush();
                         room.addClient(clientHandler);
                         clientHandler.setCurrentRoom(room);
+                        System.out.println("CURRENt ROOM : "+clientHandler.getCurrentRoom().getName());
                         break;
                     }else {
                         out.write("Password incorrect.Try again.");
@@ -144,6 +144,7 @@ public class RoomHandler{
             rooms.add(newRoom);
             newRoom.addClient(clientHandler);
             clientHandler.setCurrentRoom(newRoom);
+
             out.write("Room created and joined: " + roomName);
             out.newLine();
             out.flush();
@@ -157,4 +158,7 @@ public class RoomHandler{
     }
 
 
+    @Override
+    public void run() {
+    }
 }

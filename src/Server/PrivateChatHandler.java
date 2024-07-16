@@ -75,6 +75,8 @@ public class PrivateChatHandler implements Runnable {
         }
     }
 
+
+
     private void closeStreams() {
         try {
             client1.setIsInPrivateChat(false);
@@ -87,5 +89,7 @@ public class PrivateChatHandler implements Runnable {
             e.printStackTrace();
         }
     }
+
+
 }
 

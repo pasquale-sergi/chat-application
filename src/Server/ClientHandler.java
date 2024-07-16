@@ -21,7 +21,9 @@ public class ClientHandler implements Runnable{
     private RoomHandler roomHandler;
     private Room currentRoom;
     private List<Room> rooms;
-    private Thread handleUserChoiceThread;
+    private boolean inRoomMode = false;
+    private volatile boolean userHandled = false;
+
 
     private boolean isInPrivate = false;
     private volatile boolean inPrivateChatRequest = false;
@@ -55,12 +57,9 @@ public class ClientHandler implements Runnable{
 
         try {
             authentication();
-            connections.add(this);
-            // Start a separate thread to listen for messages from the client
-            // Handle user input in the main thread
             handleUserChoice();
-            // Listen for messages from client
             listenForMessage();
+
         }catch (Exception e){
             System.out.println("having issues with run");
             e.printStackTrace();
@@ -71,30 +70,28 @@ public class ClientHandler implements Runnable{
     //PRIVATE CHAT AND GROUP CHAT HANDLING
 
     private void handleUserChoice() {
-        handleUserChoiceThread = Thread.currentThread();
         while(true) {
             try {
-                while(!isInPrivate && !inPrivateChatRequest) {
-                    bufferedWriter.write("'j' for joining a room or create one\n'p' to start a private chat with someone: ");
-                    bufferedWriter.newLine();
-                    bufferedWriter.flush();
-                    String choice = splitInput(bufferedReader.readLine());
+                while(!isInPrivate && !inPrivateChatRequest &&!inRoomMode) {
+
+                    String choice = prompt("'j' for joining a room or create one\n'p' to start a private chat with someone: ");
 
 
                     if (choice.equalsIgnoreCase("j")) {
-                        // Join a room
-                        roomHandler = new RoomHandler(socket, db, this, rooms);
-                        roomHandler.promptForRoomChoice();
+                        inRoomMode = true;
+                        joinRoom();
                         break;
+                         // User has been handled
+
                     } else if (choice.equalsIgnoreCase("p")) {
                         // Start a private chat
                         inPrivateChatRequest = true;
                         startPrivateChat();
                         break;
+
                     } else {
-                        bufferedWriter.write("Invalid choice. Please choose one of the option.");
-                        bufferedWriter.newLine();
-                        bufferedWriter.flush();
+                        write("Invalid choice. Please choose one of the option.");
+
                     }
                 }
             } catch (IOException | SQLException e) {
@@ -102,11 +99,18 @@ public class ClientHandler implements Runnable{
             }
         }
     }
+
+    private void joinRoom() throws IOException, SQLException {
+        roomHandler = new RoomHandler(socket, db, this, rooms);
+        roomHandler.promptForRoomChoice();
+        listenForMessage();
+        //Thread roomHandlerThread = new Thread(roomHandler);
+        //roomHandlerThread.start();
+    }
     public void startPrivateChat() throws IOException {
-        bufferedWriter.write("Enter the username of the person you want to chat with: ");
-        bufferedWriter.newLine();
-        bufferedWriter.flush();
-        String recipientUsername = splitInput(bufferedReader.readLine());
+
+        String recipientUsername =prompt("Enter the username of the person you want to chat with: ");
+
         for(ClientHandler ch : connections){
 
             if(ch.getClientUsername().equalsIgnoreCase(recipientUsername)){
@@ -114,16 +118,14 @@ public class ClientHandler implements Runnable{
                 return;
             }
         }
-        bufferedWriter.write("User " + recipientUsername + " is not available.");
-        bufferedWriter.newLine();
-        bufferedWriter.flush();
+        write("User " + recipientUsername + " is not available.");
+
     }
     public void promptPrivateChatRequest(ClientHandler requester) throws IOException {
-        String response = prompt("User wants to start a private chat with you. Accept? y/n: ");
+        String response = prompt(clientUsername+" wants to start a private chat with you. Accept? y/n: ");
         if (response != null && response.trim().equalsIgnoreCase("y")) {
             isInPrivate = true;
             requester.startPrivateChatWith(this);
-            handleUserChoiceThread.interrupt();
 
         } else {
             requester.notifyPrivateChatDeclined();
@@ -131,13 +133,9 @@ public class ClientHandler implements Runnable{
     }
 
     public void startPrivateChatWith(ClientHandler ch) throws IOException {
-        bufferedWriter.write("Private chat started with " + ch.getClientUsername());
-        bufferedWriter.newLine();
-        bufferedWriter.flush();
+        write("Private chat started with " + ch.getClientUsername());
 
-        ch.bufferedWriter.write("Private chat started with " + this.clientUsername);
-        ch.bufferedWriter.newLine();
-        ch.bufferedWriter.flush();
+        ch.write("Private chat started with " + this.clientUsername);
 
         PrivateChatHandler privateChat = new PrivateChatHandler(this, ch);
         Thread chatThread = new Thread(privateChat);
@@ -145,20 +143,25 @@ public class ClientHandler implements Runnable{
     }
 
     public void notifyPrivateChatDeclined() throws IOException {
-        bufferedWriter.write("User declined your private chat request.");
-        bufferedWriter.newLine();
-        bufferedWriter.flush();
+        write("User declined your private chat request.");
     }
 
     //UTILITIES
     public void setIsInPrivateChat(boolean isInPrivate) {
         this.isInPrivate = isInPrivate;
     }
+    //write and reading buffer
     private String prompt(String message) throws IOException {
         bufferedWriter.write(message);
         bufferedWriter.newLine();
         bufferedWriter.flush();
         return splitInput(bufferedReader.readLine());
+    }
+    //writing buffer
+    private void write(String message) throws IOException{
+        bufferedWriter.write(message);
+        bufferedWriter.newLine();
+        bufferedWriter.flush();
     }
 
     public String splitInput(String input){
@@ -188,10 +191,12 @@ public class ClientHandler implements Runnable{
     }
 
     public void broadcastMessage(String message) throws IOException {
+        System.out.println("here in the broadcast");
+
         if (isInPrivate) {
-            synchronized (connections){
-                for(ClientHandler ch:connections){
-                    if(!ch.clientUsername.equalsIgnoreCase(clientUsername) && ch.isInPrivate){
+            synchronized (connections) {
+                for (ClientHandler ch : connections) {
+                    if (!ch.clientUsername.equalsIgnoreCase(clientUsername) && ch.isInPrivate) {
                         ch.bufferedWriter.write(message);
                         //this means "im done with sending data"
                         ch.bufferedWriter.newLine();
@@ -200,7 +205,7 @@ public class ClientHandler implements Runnable{
                     }
                 }
             }
-        }else if(currentRoom!=null){
+        } else {
             synchronized (currentRoom.getClients()) {
                 for (Room room : roomHandler.rooms) {
                     System.out.println("ROOM: " + room.getName() + "CLIENTS: " + room.getClients());
@@ -223,32 +228,28 @@ public class ClientHandler implements Runnable{
                 }
             }
         }
-
     }
+        public void closeEverything () {
 
-    public void closeEverything(){
-
-        try {
-            if(currentRoom!=null){
-                currentRoom.removeClient(this);
+            try {
+                if (currentRoom != null) {
+                    currentRoom.removeClient(this);
+                }
+                connections.remove(this);
+                broadcastMessage(clientUsername + " has left the chat");
+                bufferedReader.close();
+                bufferedWriter.close();
+                socket.close();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-            connections.remove(this);
-            broadcastMessage(clientUsername + " has left the chat");
-            bufferedReader.close();
-            bufferedWriter.close();
-            socket.close();
-        }catch (IOException e ){
-            e.printStackTrace();
         }
-    }
+
 
     //AUTHENTICATION METHODS
     private void authentication() {
         try {
-            bufferedWriter.write("Are you registered? y/n: ");
-            bufferedWriter.newLine();
-            bufferedWriter.flush();
-            String isRegistered = splitInput(bufferedReader.readLine());
+            String isRegistered = prompt("Are you registered? y/n: ");
 
             if (isRegistered != null && isRegistered.trim().equalsIgnoreCase("y")) {
                 authenticateClient();
@@ -265,25 +266,17 @@ public class ClientHandler implements Runnable{
 
     public void authenticateClient() throws IOException {
         while (true) {
-            bufferedWriter.write("Enter username: ");
-            bufferedWriter.newLine();
-            bufferedWriter.flush();
-            String username = splitInput(bufferedReader.readLine());
+            String username = prompt("Enter username: ");
 
-            bufferedWriter.write("Enter password: ");
-            bufferedWriter.newLine();
-            bufferedWriter.flush();
-            String password = splitInput(bufferedReader.readLine());
+            String password = prompt("Enter password: ");
 
             if (auth.authenticate(username, password)) {
-                bufferedWriter.write("Authentication successful!\nYou joined the chat as " + username);
-                bufferedWriter.newLine();
-                bufferedWriter.flush();
+                write("Authentication successful!\nYou joined the chat as " + username);
+                connections.add(this);
                 return;
             } else {
-                bufferedWriter.write("Authentication failed. Try again.");
-                bufferedWriter.newLine();
-                bufferedWriter.flush();
+                write("Authentication failed. Try again.");
+
             }
         }
 
@@ -294,31 +287,23 @@ public class ClientHandler implements Runnable{
 
     public void registerUser() throws IOException {
         while (true) {
-            bufferedWriter.write("Enter username: ");
-            bufferedWriter.newLine();
-            bufferedWriter.flush();
-            String username = splitInput(bufferedReader.readLine());
+            String username = prompt("Enter username: ");
+
             if(username!=null){
-                bufferedWriter.write("Enter password: ");
-                bufferedWriter.newLine();
-                bufferedWriter.flush();
-                String password = splitInput(bufferedReader.readLine());
+                String password = prompt("Enter password: ");
                 if(password!=null){
                     auth.registerUser(username, password);
-                    bufferedWriter.write("Registration complete! You joined the chat as " + username);
-                    bufferedWriter.newLine();
-                    bufferedWriter.flush();
+                    write("Registration complete! You joined the chat as " + username);
+
                     return;
                 }else {
-                    bufferedWriter.write("Invalid password.Try again.\n");
-                    bufferedWriter.newLine();
-                    bufferedWriter.flush();
+                    write("Invalid password.Try again.\n");
+
                 }
 
             }else{
-                bufferedWriter.write("Invalid username.Try again.\n");
-                bufferedWriter.newLine();
-                bufferedWriter.flush();
+               write("Invalid username.Try again.\n");
+
             }
 
 
